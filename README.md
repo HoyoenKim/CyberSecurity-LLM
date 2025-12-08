@@ -1,4 +1,75 @@
-# DefenderBench: A Toolkit for Evaluating Language Agents in Cybersecurity Environments
+# Cybersecurity Agent with Large Language Model for Automotive
+
+## 3. Setup
+
+### 3.1. Install
+The instructions were tested on a Linux Ubuntu distribution (both native and via WSL).
+
+If conda is not installed already, you need to install it by running the `install_conda.sh` script.
+
+```bash
+bash install-conda.sh
+```
+
+Once this is done, open a new terminal and run the initialization script:
+```bash
+bash init.sh
+```
+This will create a conda environmen named `cybersim` with all the required OS and python dependencies.
+
+To activate the environment run:
+
+```bash
+conda activate cybersim
+```
+
+### 3.2. Troubleshooting
+
+#### Missing `jupytext` / `papermill`
+
+If you see:
+
+```bash
+jupytext: command not found
+papermill: command not found
+```
+
+Install both packages via conda-forge:
+
+```bash
+conda install -c conda-forge jupytext papermill -y
+```
+
+#### Missing Jupyter kernel (python3)
+
+If you see:
+
+```bash
+jupyter_client.kernelspec.NoSuchKernel: No such kernel named python3
+```
+
+Install the Jupyter kernel dependencies and register the kernel:
+
+```bash
+conda install -c conda-forge -y ipykernel jupyter jupyter_client
+python -m ipykernel install --user --name python3 --display-name "Python 3 (cybersimllm)"
+```
+
+#### Inompatible plotly and kaleido
+
+If you see:
+
+```bash
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts. cyberbattlesim 0.1.0 requires plotly~=5.15.0, but you have plotly 6.5.0 which is incompatible.
+```
+
+Reinstall the plotly and kaleido
+
+```bash
+python -m pip uninstall -y plotly kaleido
+python -m pip install -U "plotly==5.15.0" "kaleido==0.2.1"
+```
+
 
 <p align="center">
   <a href="mailto:chiyuzh@mail.ubc.ca">Chiyu Zhang</a>,
