@@ -103,7 +103,44 @@ pip install torch
 
 ## 4. Run & Results
 
-### 4.1. Automotive Environment
+### 4.1. Pre-result of RL Agent
+
+cyberbattlesim chain, toyctf RL model reuslts are here
+- https://github.com/HoyoenKim/CyberSecurity-RL
+
+#### CyberBattleSim-Chain
+| Agent | Nodes Found | Nodes Exploited |
+|---:|:---:|:---:|
+| Random | 3 / 11 | 2 / 11 |
+| Rule-Based | 5 / 11 | 5 / 11 |
+| Tabular Q-Learning | 5 / 11 | 5 / 11 |
+| Deep Q-Learning (DQN) | 11 / 11 | 11 / 11 |
+| Deep Recurrent Q-Learning (DRQN) | 11 / 11 | 11 / 11 |
+
+#### CyberBattleSim-CTF
+| Agent | Nodes Found | Nodes Exploited |
+|---:|:---:|:---:|
+| Answer (Oracle) | 9 / 9 | 5 / 5 |
+| Random | 3 / 9 | 1 / 5 |
+| Rule-Based | 5 / 9 | 1 / 5 |
+| Tabular Q-Learning | 5 / 9 | 1 / 5 |
+| Deep Q-Learning (DQN) | 9 / 9 | 5 / 5 |
+| Deep Recurrent Q-Learning (DRQN) | 9 / 9 | 5 / 5 |
+
+### 4.2. Pre-result of LLM Agent
+
+cyberbattlesim chain, toyctf LLM model results are here
+- https://github.com/microsoft/DefenderBench
+
+| Model | CyberBattleSim-Chain | CyberBattleSim-CTF | 
+| --- | --- | --- |
+|     | winning % | winning % |
+| Llama 3.1 8B | 23.61 | 16.67 |
+| Llama 3.1 70B | 77.78 | **44.44** |
+| Llama 3.3 70B | **100.00** | 33.33 |
+
+
+### 4.3. Automotive Environment
 
 ```bash
 ./src/notebooks/run_automotive_ctf_solved.sh python3
@@ -111,17 +148,16 @@ pip install torch
 
 ![automotive_ctf_solved](figures/automotive_ctf_solved.gif)
 
-### 4.2. Base RL Agent
+### 4.4. Base RL Agent
 
-
-#### 4.2.1. Rule-Based
+#### 4.4.1. Rule-Based
 ```bash
 ./src/notebooks/run_automotive_ctf_rulebased.sh python3
 ```
 
 ![automotive_ctf_rulebased](figures/automotive_ctf_rulebased.gif)
 
-#### 4.2.2. Deep Q-Learning
+#### 4.4.2. Deep Q-Learning
 
 ```bash
 ./src/notebooks/run_automotive_ctf_dql.sh python3
@@ -129,10 +165,8 @@ pip install torch
 
 ![automotive_ctf_dql](figures/automotive_ctf_dql.gif)
 
-### 4.3. Native LLM Agent
+### 4.5. Native LLM Agent
 
-### 4.4. RL + LLM Hybrid Agent
-
-
+### 4.6. RL + LLM Hybrid Agent
 
 ## 5. Discussion
