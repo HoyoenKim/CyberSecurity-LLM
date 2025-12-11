@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-from src.utils.llm_api import LLM
-from src.agents.base_agent import BaseAgent
+from src.defenderbench.llm_api import LLM
+from src.cyberbattle.llm_agents.base_agent import BaseAgent
 
 class ActorCriticAgent(BaseAgent):
     """

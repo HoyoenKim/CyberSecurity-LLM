@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import re
 from .base_agent import BaseAgent
-from src.utils.llm_api import LLM
+from src.defenderbench.llm_api import LLM
 
 class ReActAgent(BaseAgent):
     """

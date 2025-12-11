@@ -4,11 +4,11 @@ import os
 import sys
 from termcolor import colored
 
-from src.agents.random_agent import RandomAgent
-from src.agents.actor_critic import ActorCriticAgent
-from src.agents.react_agent import ReActAgent
-from src.agents.tree_of_thoughts_agent import TreeOfThoughtsAgent
-from src.utils.llm_api import LLM
+from src.cyberbattle.llm_agents.random_agent import RandomAgent
+from src.cyberbattle.llm_agents.actor_critic import ActorCriticAgent
+from src.cyberbattle.llm_agents.react_agent import ReActAgent
+from src.cyberbattle.llm_agents.tree_of_thoughts_agent import TreeOfThoughtsAgent
+from src.defenderbench.llm_api import LLM
 from src.defenderbench import benchmark_v0
 
 def main(args):  
