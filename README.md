@@ -1,5 +1,9 @@
 # Cybersecurity Agent with Large Language Model for Automotive
 
+## 1. Overview
+
+## 2. Model
+
 ## 3. Setup
 
 ### 3.1. Install
@@ -69,6 +73,36 @@ Reinstall the plotly and kaleido
 python -m pip uninstall -y plotly kaleido
 python -m pip install -U "plotly==5.15.0" "kaleido==0.2.1"
 ```
+
+```bash
+ModuleNotFoundError: No module named 'torch'
+pip install torch
+```
+
+## 4. Run & Results
+
+### 4.1. Automotive Topology
+
+### 4.2. Base RL Model
+
+### 4.3. Native LLM Model
+
+### 4.4. RL, LLM Hybrid Model
+
+```bash
+./src/notebooks/run_automotive_ctf_solved.sh python3
+```
+
+```bash
+./src/notebooks/run_automotive_ctf_rulebased.sh python3
+```
+
+```bash
+./src/notebooks/run_automotive_ctf_dql.sh python3
+```
+
+
+## 5. Discussion
 
 
 <p align="center">
