@@ -1,6 +1,10 @@
 # Cybersecurity Agent with Large Language Model for Automotive
-This project implements cybersecurity red-team (attacker) RL + LLM agents in Microsoft’s **CyberBattleSim** environment. 
+This project implements cybersecurity red-team (attacker) RL + LLM agents in Microsoft’s **CyberBattleSim** environment.
+
+Environment & RL Model base:
 - CyberBattleSim: https://github.com/microsoft/CyberBattleSim
+
+LLM Model base:
 - Defenderbench: https://github.com/microsoft/DefenderBench
 
 Additional project documentation is available in `/doc`.
