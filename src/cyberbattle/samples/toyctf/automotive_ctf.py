@@ -1,32 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
-"""
-Automotive CTF-like environment with segmented in-vehicle networks.
-
-Bus topology (intended attack graph):
-- External attacker (AttackerLaptop)
-  -> Wireless entry: IVI (WIFI/BT/HTTPS) -> IVI[user=media] shell
-  -> Cellular entry: Telematics (CELL/HTTPS) -> Telematics[user=root] shell
-  -> Physical entry: OBD (USB) -> DCAN credential
-
-- Pivot to GTW (Gateway):
-  - via IVI[user=media] using ETH_MGMT + gtw_admin_token
-  - OR via OBD using DCAN + dcan_access
-  - OR via Telematics[user=root] using OTA + ota_update_token (token obtained from OTA.Server)
-
-- GTW then leaks bus access creds:
-  - bcan_access / ccan_access / lin_access
-
-- Own buses:
-  - connect_and_infect(GTW -> BCAN, "BCAN", bcan_access)
-  - connect_and_infect(GTW -> CCAN, "CCAN", ccan_access)
-  - connect_and_infect(GTW -> LIN,  "LIN",  lin_access)
-
-- Impact-only attacks are LOCAL on bus nodes (not remote on ECUs).
-- Full compromise chain: owned bus node -> connect_and_infect(bus -> ECU, *_DIAG, bus_access) -> ECU becomes owned -> LOCAL post-compromise dumps.
-"""
-
 from cyberbattle.simulation import model as m
 from cyberbattle.simulation.model import NodeID, NodeInfo, VulnerabilityID, VulnerabilityInfo
 from typing import Dict, Iterator, cast, Tuple
@@ -51,8 +22,10 @@ PORT_BCAN_DIAG = "BCAN_DIAG"
 PORT_CCAN_DIAG = "CCAN_DIAG"
 PORT_LIN_DIAG  = "LIN_DIAG"
 
+
 def allow(*ports: str):
     return [m.FirewallRule(p, m.RulePermission.ALLOW) for p in ports]
+
 
 # ---- Nodes
 nodes = {
@@ -63,17 +36,31 @@ nodes = {
         services=[],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_HTTPS, PORT_WIFI, PORT_BT, PORT_CELL, PORT_USB, PORT_SHELL),
-            # 현실성: 외부 공격자는 내부 버스/관리 포트로 직접 못 나간다고 가정
             outgoing=allow(PORT_HTTPS, PORT_WIFI, PORT_BT, PORT_CELL, PORT_USB, PORT_SHELL),
         ),
         value=0,
         properties=["Attacker", "Laptop", "Tools"],
         vulnerabilities=dict(
-            ScanWirelessVicinity=m.VulnerabilityInfo(
-                description="Discover nearby endpoints (IVI/Telematics) and presence of OBD port.",
+            # [변경] ScanWirelessVicinity → WIFI / CELL / 물리 스캔으로 분리
+            ScanWIFINetworks=m.VulnerabilityInfo(
+                description="Scan nearby WIFI networks and discover IVI head unit.",
                 type=m.VulnerabilityType.LOCAL,
-                outcome=m.LeakedNodesId(["IVI", "Telematics", "OBD"]),
-                reward_string="Discovered IVI, Telematics, and the OBD interface.",
+                outcome=m.LeakedNodesId(["IVI"]),
+                reward_string="Discovered IVI via WIFI scan.",
+                cost=1.0,
+            ),
+            ScanCellularEndpoints=m.VulnerabilityInfo(
+                description="Scan cellular control-plane and discover Telematics unit.",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.LeakedNodesId(["Telematics"]),
+                reward_string="Discovered Telematics via CELL scan.",
+                cost=1.0,
+            ),
+            InspectVehiclePhysical=m.VulnerabilityInfo(
+                description="Physically inspect vehicle interior and discover OBD service port.",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.LeakedNodesId(["OBD"]),
+                reward_string="Discovered OBD diagnostic port via physical inspection.",
                 cost=1.0,
             ),
             AcquireOBDDongle=m.VulnerabilityInfo(
@@ -94,7 +81,9 @@ nodes = {
     # IVI entry (wireless)
     # -------------------------------------------------------------------------
     "IVI": m.NodeInfo(
-        services=[m.ListeningService(PORT_WIFI), m.ListeningService(PORT_BT), m.ListeningService(PORT_HTTPS)],
+        services=[m.ListeningService(PORT_WIFI),
+                  m.ListeningService(PORT_BT),
+                  m.ListeningService(PORT_HTTPS)],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_WIFI, PORT_BT, PORT_HTTPS),
             # IVI는 GW 관리/진단(DCAN) 방향만 의미 있게 통신 가능
@@ -107,9 +96,13 @@ nodes = {
                 description="Exploit IVI WebView to obtain a media shell credential.",
                 type=m.VulnerabilityType.REMOTE,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="IVI[user=media]", port=PORT_SHELL, credential="ivi_media_shell")
+                    m.CachedCredential(node="IVI[user=media]",
+                                       port=PORT_SHELL,
+                                       credential="ivi_media_shell")
                 ]),
-                rates=m.Rates(successRate=1.0, probingDetectionRate=0.0, exploitDetectionRate=0.0),
+                rates=m.Rates(successRate=1.0,
+                              probingDetectionRate=0.0,
+                              exploitDetectionRate=0.0),
                 reward_string="WebView exploit: obtained IVI media shell credential.",
                 cost=2.0,
             ),
@@ -125,7 +118,8 @@ nodes = {
     ),
 
     "IVI[user=media]": m.NodeInfo(
-        services=[m.ListeningService(PORT_SHELL, allowedCredentials=["ivi_media_shell"])],
+        services=[m.ListeningService(PORT_SHELL,
+                                     allowedCredentials=["ivi_media_shell"])],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_SHELL),
             outgoing=allow(PORT_ETH_MGMT, PORT_DCAN),  # IVI media도 GW/진단 방향만
@@ -145,7 +139,9 @@ nodes = {
                 description="Dump GTW admin token used for ETH_MGMT access.",
                 type=m.VulnerabilityType.LOCAL,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="GTW", port=PORT_ETH_MGMT, credential="gtw_admin_token")
+                    m.CachedCredential(node="GTW",
+                                       port=PORT_ETH_MGMT,
+                                       credential="gtw_admin_token")
                 ]),
                 reward_string="Dumped gtw_admin_token.",
                 cost=1.0,
@@ -154,7 +150,9 @@ nodes = {
                 description="Extract cached OTA session token (for OTA.Server HTTPS).",
                 type=m.VulnerabilityType.LOCAL,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="OTA.Server", port=PORT_HTTPS, credential="ota_session_token")
+                    m.CachedCredential(node="OTA.Server",
+                                       port=PORT_HTTPS,
+                                       credential="ota_session_token")
                 ]),
                 reward_string="Extracted ota_session_token.",
                 cost=1.0,
@@ -163,10 +161,11 @@ nodes = {
     ),
 
     # -------------------------------------------------------------------------
-    # OBD -> DCAN
+    # OBD -> DCAN (수정: 여기서는 DCAN만 열림)
     # -------------------------------------------------------------------------
     "OBD": m.NodeInfo(
-        services=[m.ListeningService(PORT_USB, allowedCredentials=["obd_dongle_token"])],
+        services=[m.ListeningService(PORT_USB,
+                                     allowedCredentials=["obd_dongle_token"])],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_USB),
             outgoing=allow(PORT_DCAN),
@@ -175,21 +174,27 @@ nodes = {
         properties=["OBD", "Physical"],
         owned_string="FLAG: OBD access established.",
         vulnerabilities=dict(
+            # [변경] 이전에는 GTW용 dcan_access까지 같이 줬는데, 이제는 DCAN만
             EnableDCANAccess=m.VulnerabilityInfo(
-                description="Enable diagnostic CAN access and obtain dcan_access credential.",
+                description="Enable diagnostic CAN access from OBD to DCAN (workshop mode).",
                 type=m.VulnerabilityType.LOCAL,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="DCAN", port=PORT_DCAN, credential="dcan_access"),
-                    m.CachedCredential(node="GTW",  port=PORT_DCAN, credential="dcan_access"),
+                    m.CachedCredential(node="DCAN",
+                                       port=PORT_DCAN,
+                                       credential="dcan_access"),
                 ]),
-                reward_string="Enabled DCAN access (dcan_access).",
+                reward_string="Enabled DCAN access (dcan_access) from OBD.",
                 cost=1.0,
             )
         ),
     ),
 
+    # -------------------------------------------------------------------------
+    # DCAN (수정: 여기서 GTW 피벗을 위한 추가 단계 제공)
+    # -------------------------------------------------------------------------
     "DCAN": m.NodeInfo(
-        services=[m.ListeningService(PORT_DCAN, allowedCredentials=["dcan_access"])],
+        services=[m.ListeningService(PORT_DCAN,
+                                     allowedCredentials=["dcan_access"])],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_DCAN),
             outgoing=allow(PORT_DCAN),
@@ -197,13 +202,34 @@ nodes = {
         value=10,
         properties=["Bus", "DCAN"],
         owned_string="DCAN node owned (diagnostic bus access).",
+        vulnerabilities=dict(
+            DiscoverGatewayFromDiagnostics=m.VulnerabilityInfo(
+                description="Use diagnostic broadcasts to infer presence of central gateway (GTW).",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.LeakedNodesId(["GTW"]),
+                reward_string="Diagnostic frames reveal presence of GTW behind DCAN.",
+                cost=1.0,
+            ),
+            ProvisionGatewayDCANAccess=m.VulnerabilityInfo(
+                description="Abuse misconfigured diagnostic routing to reuse dcan_access against GTW DCAN endpoint.",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.LeakedCredentials(credentials=[
+                    m.CachedCredential(node="GTW",
+                                       port=PORT_DCAN,
+                                       credential="dcan_access"),
+                ]),
+                reward_string="GTW DCAN port now reachable with dcan_access credential.",
+                cost=1.0,
+            ),
+        ),
     ),
 
     # -------------------------------------------------------------------------
     # Telematics + OTA backend (cellular path)
     # -------------------------------------------------------------------------
     "Telematics": m.NodeInfo(
-        services=[m.ListeningService(PORT_CELL), m.ListeningService(PORT_HTTPS)],
+        services=[m.ListeningService(PORT_CELL),
+                  m.ListeningService(PORT_HTTPS)],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_CELL, PORT_HTTPS),
             outgoing=allow(PORT_HTTPS, PORT_SHELL),
@@ -215,9 +241,13 @@ nodes = {
                 description="Exploit Telematics unit to get a root shell credential.",
                 type=m.VulnerabilityType.REMOTE,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="Telematics[user=root]", port=PORT_SHELL, credential="tcu_root_shell")
+                    m.CachedCredential(node="Telematics[user=root]",
+                                       port=PORT_SHELL,
+                                       credential="tcu_root_shell")
                 ]),
-                rates=m.Rates(successRate=1.0, probingDetectionRate=0.0, exploitDetectionRate=0.0),
+                rates=m.Rates(successRate=1.0,
+                              probingDetectionRate=0.0,
+                              exploitDetectionRate=0.0),
                 reward_string="Telematics RCE: obtained tcu_root_shell.",
                 cost=2.0,
             ),
@@ -225,7 +255,9 @@ nodes = {
                 description="Discover OTA backend endpoint.",
                 type=m.VulnerabilityType.REMOTE,
                 outcome=m.LeakedNodesId(["OTA.Server"]),
-                rates=m.Rates(successRate=1.0, probingDetectionRate=0.0, exploitDetectionRate=0.0),
+                rates=m.Rates(successRate=1.0,
+                              probingDetectionRate=0.0,
+                              exploitDetectionRate=0.0),
                 reward_string="Discovered OTA.Server endpoint.",
                 cost=1.0,
             ),
@@ -233,9 +265,13 @@ nodes = {
                 description="Abuse weak API to obtain OTA session token.",
                 type=m.VulnerabilityType.REMOTE,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="OTA.Server", port=PORT_HTTPS, credential="ota_session_token")
+                    m.CachedCredential(node="OTA.Server",
+                                       port=PORT_HTTPS,
+                                       credential="ota_session_token")
                 ]),
-                rates=m.Rates(successRate=1.0, probingDetectionRate=0.0, exploitDetectionRate=0.0),
+                rates=m.Rates(successRate=1.0,
+                              probingDetectionRate=0.0,
+                              exploitDetectionRate=0.0),
                 reward_string="Obtained ota_session_token via telematics.",
                 cost=2.0,
             ),
@@ -243,7 +279,8 @@ nodes = {
     ),
 
     "Telematics[user=root]": m.NodeInfo(
-        services=[m.ListeningService(PORT_SHELL, allowedCredentials=["tcu_root_shell"])],
+        services=[m.ListeningService(PORT_SHELL,
+                                     allowedCredentials=["tcu_root_shell"])],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_SHELL),
             # Telematics는 OTA/HTTPS만 (내부에서 GTW OTA 채널로 접근 가능)
@@ -253,7 +290,6 @@ nodes = {
         properties=["Telematics", "PostExploitation"],
         owned_string="FLAG: Telematics root shell obtained.",
         vulnerabilities=dict(
-            # (선택) 여기서 IVI/WIFI 키를 덤프해서 IVI 공격을 쉽게 만들 수도 있음
             DumpVehicleBackendConfig=m.VulnerabilityInfo(
                 description="Dump backend config / endpoints (impact-only).",
                 type=m.VulnerabilityType.LOCAL,
@@ -266,7 +302,8 @@ nodes = {
     ),
 
     "OTA.Server": m.NodeInfo(
-        services=[m.ListeningService(PORT_HTTPS, allowedCredentials=["ota_session_token"])],
+        services=[m.ListeningService(PORT_HTTPS,
+                                     allowedCredentials=["ota_session_token"])],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_HTTPS),
             outgoing=allow(PORT_HTTPS),
@@ -286,7 +323,9 @@ nodes = {
                 description="Download update bundle and extract ota_update_token for GTW OTA port.",
                 type=m.VulnerabilityType.REMOTE,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="GTW", port=PORT_OTA, credential="ota_update_token")
+                    m.CachedCredential(node="GTW",
+                                       port=PORT_OTA,
+                                       credential="ota_update_token")
                 ]),
                 rates=m.Rates(successRate=1.0),
                 reward_string="Obtained ota_update_token.",
@@ -300,9 +339,12 @@ nodes = {
     # -------------------------------------------------------------------------
     "GTW": m.NodeInfo(
         services=[
-            m.ListeningService(PORT_ETH_MGMT, allowedCredentials=["gtw_admin_token"]),
-            m.ListeningService(PORT_DCAN, allowedCredentials=["dcan_access"]),
-            m.ListeningService(PORT_OTA, allowedCredentials=["ota_update_token"]),
+            m.ListeningService(PORT_ETH_MGMT,
+                               allowedCredentials=["gtw_admin_token"]),
+            m.ListeningService(PORT_DCAN,
+                               allowedCredentials=["dcan_access"]),
+            m.ListeningService(PORT_OTA,
+                               allowedCredentials=["ota_update_token"]),
         ],
         firewall=m.FirewallConfiguration(
             incoming=allow(PORT_ETH_MGMT, PORT_DCAN, PORT_OTA),
@@ -320,20 +362,31 @@ nodes = {
                 reward_string="Discovered bus topology (BCAN/CCAN/LIN/DCAN).",
                 cost=0.5,
             ),
+            # [변경] TestBenchECU를 포함한 ECU 나열(데코이 ECU 포함)
             EnumerateECUs=m.VulnerabilityInfo(
-                description="Enumerate ECUs behind each bus.",
+                description="Enumerate ECUs behind each bus (including some decoy ECUs on test bench).",
                 type=m.VulnerabilityType.LOCAL,
-                outcome=m.LeakedNodesId(["BCM", "DoorLockECU", "ESP", "VCU", "ADAS", "IMU", "BMS", "Airbag"]),
-                reward_string="Enumerated ECUs on BCAN/CCAN/LIN.",
+                outcome=m.LeakedNodesId([
+                    "BCM", "DoorLockECU", "ESP", "VCU",
+                    "ADAS", "IMU", "BMS", "Airbag",
+                    "TestBenchECU",
+                ]),
+                reward_string="Enumerated ECUs on BCAN/CCAN/LIN (and a test-bench ECU).",
                 cost=1.0,
             ),
             DumpBusAccessCreds=m.VulnerabilityInfo(
                 description="Dump internal bus access credentials (simplified; no SecOC).",
                 type=m.VulnerabilityType.LOCAL,
                 outcome=m.LeakedCredentials(credentials=[
-                    m.CachedCredential(node="BCAN", port=PORT_BCAN, credential="bcan_access"),
-                    m.CachedCredential(node="CCAN", port=PORT_CCAN, credential="ccan_access"),
-                    m.CachedCredential(node="LIN",  port=PORT_LIN,  credential="lin_access"),
+                    m.CachedCredential(node="BCAN",
+                                       port=PORT_BCAN,
+                                       credential="bcan_access"),
+                    m.CachedCredential(node="CCAN",
+                                       port=PORT_CCAN,
+                                       credential="ccan_access"),
+                    m.CachedCredential(node="LIN",
+                                       port=PORT_LIN,
+                                       credential="lin_access"),
                 ]),
                 reward_string="Dumped bus access creds: bcan_access / ccan_access / lin_access.",
                 cost=1.0,
@@ -342,12 +395,16 @@ nodes = {
     ),
 
     # -------------------------------------------------------------------------
-    # Bus segment nodes: impact-only attacks are LOCAL here
+    # Bus segment nodes: 실제 공격 + 데코이 취약점/포트 추가
     # -------------------------------------------------------------------------
     "BCAN": m.NodeInfo(
-        services=[m.ListeningService(PORT_BCAN, allowedCredentials=["bcan_access"])],
+        services=[
+            m.ListeningService(PORT_BCAN, allowedCredentials=["bcan_access"]),
+            # [추가] 데코이 포트 – 어디서도 크리덴셜 안 나옴
+            m.ListeningService("BCAN_DEBUG"),
+        ],
         firewall=m.FirewallConfiguration(
-            incoming=allow(PORT_BCAN),
+            incoming=allow(PORT_BCAN, "BCAN_DEBUG"),
             outgoing=allow(PORT_BCAN_DIAG),
         ),
         value=10,
@@ -370,13 +427,25 @@ nodes = {
                 reward_string="FLAG: door actuation triggered via BCAN (impact-only).",
                 cost=1.0,
             ),
+            # [추가] 데코이: 텔레메트리만 읽고 아무 새 노드/크리덴셜 없음
+            PollAmbientTemperature=m.VulnerabilityInfo(
+                description="Decoy: poll ambient temperature frames on BCAN (no new access).",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.CustomerData(),
+                rates=m.Rates(successRate=1.0),
+                reward_string="Read ambient temperature over BCAN (no additional compromise).",
+                cost=1.0,
+            ),
         ),
     ),
 
     "CCAN": m.NodeInfo(
-        services=[m.ListeningService(PORT_CCAN, allowedCredentials=["ccan_access"])],
+        services=[
+            m.ListeningService(PORT_CCAN, allowedCredentials=["ccan_access"]),
+            m.ListeningService("CCAN_DEBUG"),
+        ],
         firewall=m.FirewallConfiguration(
-            incoming=allow(PORT_CCAN),
+            incoming=allow(PORT_CCAN, "CCAN_DEBUG"),
             outgoing=allow(PORT_CCAN_DIAG),
         ),
         value=10,
@@ -423,13 +492,25 @@ nodes = {
                 reward_string="FLAG: BMS telemetry modified via CCAN (impact-only).",
                 cost=2.0,
             ),
+            # [추가] 데코이: 디버그 카운터 읽기
+            PollDebugCounters=m.VulnerabilityInfo(
+                description="Decoy: poll CCAN debug counters (no new capabilities).",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.CustomerData(),
+                rates=m.Rates(successRate=1.0),
+                reward_string="Read CCAN debug counters (no additional compromise).",
+                cost=1.0,
+            ),
         ),
     ),
 
     "LIN": m.NodeInfo(
-        services=[m.ListeningService(PORT_LIN, allowedCredentials=["lin_access"])],
+        services=[
+            m.ListeningService(PORT_LIN, allowedCredentials=["lin_access"]),
+            m.ListeningService("LIN_DEBUG"),
+        ],
         firewall=m.FirewallConfiguration(
-            incoming=allow(PORT_LIN),
+            incoming=allow(PORT_LIN, "LIN_DEBUG"),
             outgoing=allow(PORT_LIN_DIAG),
         ),
         value=10,
@@ -443,17 +524,27 @@ nodes = {
                 rates=m.Rates(successRate=1.0),
                 reward_string="FLAG: airbag status tampered via LIN (impact-only).",
                 cost=3.0,
-            )
+            ),
+            # [추가] 데코이: 실내 조명 상태 읽기
+            ReadInteriorLightingStatus=m.VulnerabilityInfo(
+                description="Decoy: read interior lighting status over LIN.",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.CustomerData(),
+                rates=m.Rates(successRate=1.0),
+                reward_string="Read interior lighting status via LIN (no additional compromise).",
+                cost=1.0,
+            ),
         ),
     ),
 
     # -------------------------------------------------------------------------
-    # ECUs: no CAN/LIN impact REMOTE vulns here.
-    # Compromise path is via *_DIAG port (connect_and_infect from owned bus node).
+    # ECUs: (원래 구조 유지) + 데코이 ECU 추가
     # -------------------------------------------------------------------------
     "BCM": m.NodeInfo(
-        services=[m.ListeningService(PORT_BCAN_DIAG, allowedCredentials=["bcan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_BCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_BCAN_DIAG,
+                                     allowedCredentials=["bcan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_BCAN_DIAG),
+                                         outgoing=[]),
         value=80,
         properties=["ECU", "Body", "BCAN"],
         owned_string="BCM owned (diagnostic session established).",
@@ -470,8 +561,10 @@ nodes = {
     ),
 
     "DoorLockECU": m.NodeInfo(
-        services=[m.ListeningService(PORT_BCAN_DIAG, allowedCredentials=["bcan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_BCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_BCAN_DIAG,
+                                     allowedCredentials=["bcan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_BCAN_DIAG),
+                                         outgoing=[]),
         value=50,
         properties=["ECU", "Body", "BCAN"],
         owned_string="DoorLockECU owned (diagnostic session established).",
@@ -488,8 +581,10 @@ nodes = {
     ),
 
     "ESP": m.NodeInfo(
-        services=[m.ListeningService(PORT_CCAN_DIAG, allowedCredentials=["ccan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_CCAN_DIAG,
+                                     allowedCredentials=["ccan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG),
+                                         outgoing=[]),
         value=120,
         properties=["ECU", "Chassis", "CCAN"],
         owned_string="ESP owned (diagnostic session established).",
@@ -506,8 +601,10 @@ nodes = {
     ),
 
     "VCU": m.NodeInfo(
-        services=[m.ListeningService(PORT_CCAN_DIAG, allowedCredentials=["ccan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_CCAN_DIAG,
+                                     allowedCredentials=["ccan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG),
+                                         outgoing=[]),
         value=100,
         properties=["ECU", "Powertrain", "CCAN"],
         owned_string="VCU owned (diagnostic session established).",
@@ -524,8 +621,10 @@ nodes = {
     ),
 
     "ADAS": m.NodeInfo(
-        services=[m.ListeningService(PORT_CCAN_DIAG, allowedCredentials=["ccan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_CCAN_DIAG,
+                                     allowedCredentials=["ccan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG),
+                                         outgoing=[]),
         value=70,
         properties=["ECU", "ADAS", "CCAN"],
         owned_string="ADAS owned (diagnostic session established).",
@@ -542,8 +641,10 @@ nodes = {
     ),
 
     "IMU": m.NodeInfo(
-        services=[m.ListeningService(PORT_CCAN_DIAG, allowedCredentials=["ccan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_CCAN_DIAG,
+                                     allowedCredentials=["ccan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG),
+                                         outgoing=[]),
         value=40,
         properties=["ECU", "Sensor", "CCAN"],
         owned_string="IMU owned (diagnostic session established).",
@@ -560,8 +661,10 @@ nodes = {
     ),
 
     "BMS": m.NodeInfo(
-        services=[m.ListeningService(PORT_CCAN_DIAG, allowedCredentials=["ccan_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_CCAN_DIAG,
+                                     allowedCredentials=["ccan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG),
+                                         outgoing=[]),
         value=90,
         properties=["ECU", "Energy", "CCAN"],
         owned_string="BMS owned (diagnostic session established).",
@@ -578,8 +681,10 @@ nodes = {
     ),
 
     "Airbag": m.NodeInfo(
-        services=[m.ListeningService(PORT_LIN_DIAG, allowedCredentials=["lin_access"])],
-        firewall=m.FirewallConfiguration(incoming=allow(PORT_LIN_DIAG), outgoing=[]),
+        services=[m.ListeningService(PORT_LIN_DIAG,
+                                     allowedCredentials=["lin_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_LIN_DIAG),
+                                         outgoing=[]),
         value=110,
         properties=["ECU", "Safety", "LIN"],
         owned_string="Airbag ECU owned (diagnostic session established).",
@@ -594,6 +699,27 @@ nodes = {
             ),
         ),
     ),
+
+    # [추가] 데코이 ECU – CCAN에 붙은 저가치 테스트 벤치 ECU
+    "TestBenchECU": m.NodeInfo(
+        services=[m.ListeningService(PORT_CCAN_DIAG,
+                                     allowedCredentials=["ccan_access"])],
+        firewall=m.FirewallConfiguration(incoming=allow(PORT_CCAN_DIAG),
+                                         outgoing=[]),
+        value=5,
+        properties=["ECU", "TestBench", "CCAN"],
+        owned_string="TestBenchECU owned (diagnostic session established, low value).",
+        vulnerabilities=dict(
+            DumpTestLogs=m.VulnerabilityInfo(
+                description="Decoy: dump non-sensitive test logs (no new knowledge).",
+                type=m.VulnerabilityType.LOCAL,
+                outcome=m.CustomerData(),
+                rates=m.Rates(successRate=1.0),
+                reward_string="Collected non-sensitive test logs from TestBenchECU.",
+                cost=1.0,
+            ),
+        ),
+    ),
 }
 
 global_vulnerability_library: Dict[VulnerabilityID, VulnerabilityInfo] = dict([])
@@ -602,6 +728,7 @@ ENV_IDENTIFIERS = m.infer_constants_from_nodes(
     cast(Iterator[Tuple[NodeID, NodeInfo]], list(nodes.items())),
     global_vulnerability_library,
 )
+
 
 def new_environment() -> m.Environment:
     return m.Environment(

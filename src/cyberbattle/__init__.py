@@ -10,7 +10,7 @@ from . import simulation
 from . import agents
 from ._env.cyberbattle_env import AttackerGoal, DefenderGoal
 from .samples.chainpattern import chainpattern
-from .samples.toyctf import toy_ctf
+from .samples.toyctf import toy_ctf, automotive_ctf
 from .samples.active_directory import generate_ad
 from .simulation import generate_network, model
 
@@ -69,6 +69,22 @@ register(
     entry_point="cyberbattle._env.cyberbattle_chain:CyberBattleChain",
     kwargs={"size": 4, "defender_agent": None, "attacker_goal": AttackerGoal(own_atleast_percent=1.0), "defender_goal": DefenderGoal(eviction=True), "winning_reward": 5000.0, "losing_reward": 0.0},
     reward_threshold=2200,
+)
+
+if "CyberBattleAutomotiveCTF-v0" in registry:
+    del registry["CyberBattleAutomotiveCTF-v0"]
+
+register(
+    id="CyberBattleAutomotiveCTF-v0",
+    cyberbattle_env_identifiers=automotive_ctf.ENV_IDENTIFIERS,
+    entry_point="cyberbattle._env.cyberbattle_automotive_ctf:CyberBattleAutomotiveCTF",
+    kwargs={
+        "defender_agent": None,
+        # 예시: 전체 노드 중 4개 이상 장악하면 성공
+        "attacker_goal": AttackerGoal(own_atleast=6),
+        "defender_goal": DefenderGoal(eviction=True),
+    },
+    # max_episode_steps=2600,
 )
 
 ad_envs = [f"ActiveDirectory-v{i}" for i in range(0, 10)]
