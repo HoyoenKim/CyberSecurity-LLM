@@ -227,6 +227,9 @@ Thought: However, I need a credential for 3_LinuxNode to connect to it.
 Final Score: 4/12
 ```
 
+logs are available at 
+- [llama3.1. 7B Chain10 Logs](./src/notebooks/output/chain10_llama31_8B/chain10_Llama-3.1-8B-Instruct_log.txt)
+
 #### 2) CyberBattleSim-CTF
 
 ```bash
@@ -240,6 +243,10 @@ python3 ./src/notebooks/run_huggingface_llm.py \
 ```bash
 Final Score: 1/6
 ```
+
+src\notebooks\output\chain10_llama31_8B\chain10_Llama-3.1-8B-Instruct_log.txt
+logs are available at 
+- [llama3.1. 7B ToyCTF Logs](./src/notebooks/output/toyctf_llama31_8B/toyctf_Llama-3.1-8B-Instruct_log.txt)
 
 #### 3) CyberBattleSim-Automotive
 
@@ -276,6 +283,8 @@ Thought: We should try to perform a "DumpVehicleBackendConfig" attack on the Att
 Final Score: 2/6
 ```
 
+logs are available at 
+- [llama3.1. 7B AutomotiveCTF Logs](./src/notebooks/output/automotive_ctf_llama31_8B/automotive_ctf_Llama-3.1-8B-Instruct_log.txt)
 #### 4.5.2. chatgpt 5.1
 
 #### 1) CyberBattleSim-Chain10
@@ -292,6 +301,9 @@ python3 ./src/notebooks/run_openai_llm.py \
 Final Score: 12/12
 ```
 
+logs are available at 
+- [GPT 5.1. Chain10 Logs](./src/notebooks/output/chain10_chatgpt51/chain10_chatgpt51.txt)
+
 #### 2) CyberBattleSim-CTF
 ```bash
 python3 ./src/notebooks/run_openai_llm.py \
@@ -305,6 +317,9 @@ python3 ./src/notebooks/run_openai_llm.py \
 Final Score: 3/6
 ```
 
+logs are available at 
+- [GPT 5.1. ToyCTF Logs](./src/notebooks/output/toyctf_chatgpt51/toyctf_chatgpt51.txt)
+
 #### 3) CyberBattleSim-Automotive
 
 ```bash
@@ -314,6 +329,9 @@ python3 ./src/notebooks/run_openai_llm.py \
     --max_steps 100 \
     --output_dir ./src/notebooks/output/automotive_ctf_chatgpt51 > ./src/notebooks/output/automotive_ctf_chatgpt51/automotive_ctf_chatgpt51.txt
 ```
+
+logs are available at 
+- [GPT 5.1. AutomotiveCTF Logs](./src/notebooks/output/automotive_ctf_chatgpt51/automotive_ctf_chatgpt51.txt)
 
 ```bash
 Final Score: 6/6
@@ -334,6 +352,9 @@ python3 ./src/notebooks/run_openai_llm2.py \
 ```bash
 Final Score: 3/6
 ```
+
+logs are available at 
+- [GPT 5.2. ToyCTF Logs](./src/notebooks/output/toyctf_chatgpt52/toyctf_chatgpt52.txt)
 
 #### 4.5.3. LLM Agent auto report generate
 
@@ -386,10 +407,6 @@ openai.BadRequestError: Error code: 400 - {'error': {'message': 'Invalid prompt:
 ```
 
 fix prompt
-
-
-
-
 
 ### 4.6. RL + LLM Hybrid Agent
 
