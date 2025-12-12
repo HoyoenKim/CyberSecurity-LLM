@@ -335,7 +335,48 @@ python3 ./src/notebooks/run_openai_llm2.py \
 Final Score: 3/6
 ```
 
-#### 4.5.3. Troubleshooting
+#### 4.5.3. LLM Agent auto report generate
+
+#### 1) CyberBattleSim-Chain
+
+```bash
+python3 ./src/notebooks/run_llm_report.py \
+  --input_json ./src/notebooks/output/chain10_chatgpt51/chain10_gpt-5.1.json \
+  --env chain10 \
+  --model gpt-5.1 \
+  --output_md ./src/notebooks/output/chain10_chatgpt51/chain10_gpt-5.1.md
+```
+
+reports are available at 
+- [Chain10 Security Report](./src/notebooks/output/chain10_chatgpt51/chain10_gpt-5.1.md)
+
+#### 2) CyberBattleSim-CTF
+
+```bash
+python3 ./src/notebooks/run_llm_report.py \
+  --input_json ./src/notebooks/output/toyctf_chatgpt51/toyctf_gpt-5.1.json \
+  --env toyctf \
+  --model gpt-5.1 \
+  --output_md ./src/notebooks/output/toyctf_chatgpt51/toyctf_gpt-5.1.md
+```
+
+reports are available at 
+- [ToyCTF Security Report](./src/notebooks/output/chain10_chatgpt51/chain10_gpt-5.1.md)
+
+#### 3) CyberBattleSim-Automotive
+
+```bash
+python3 ./src/notebooks/run_llm_report.py \
+  --input_json ./src/notebooks/output/automotive_ctf_chatgpt51/automotive_ctf_gpt-5.1.json \
+  --env automotive \
+  --model gpt-5.1 \
+  --output_md ./src/notebooks/output/automotive_ctf_chatgpt51/automotive_ctf_gpt-5.1.md
+```
+
+reports are available at 
+- [Automotive CTF Security Report](./src/notebooks/output/automotive_ctf_chatgpt51/automotive_ctf_gpt-5.1.md)
+
+#### 4.5.4. Troubleshooting
 
 #### 1) If you got `our prompt was flagged as potentially violating our usage policy`
 
@@ -347,6 +388,37 @@ openai.BadRequestError: Error code: 400 - {'error': {'message': 'Invalid prompt:
 fix prompt
 
 
+
+
+
 ### 4.6. RL + LLM Hybrid Agent
+
+deep rl -> good at toy ctf (복잡)
+llm -> good at automotive ctf (생소)
+
+hybrid model -> good at both
+
+
+RL: DQL
+LLM: chatgpt 5.1.
+
+
+#### 1) Toy CTF
+
+```bash
+./src/notebooks/run_chain10_hybrid_dql_llm.sh python3
+```
+
+#### 2) Toy CTF
+
+```bash
+./src/notebooks/run_toy_ctf_hybrid_dql_llm.sh python3
+```
+
+#### 3) Automotive CTF
+
+```bash
+./src/notebooks/run_automotive_ctf_hybrid_dql_llm.sh python3
+```
 
 ## 5. Discussion
