@@ -6,8 +6,7 @@ from collections import defaultdict
 import numpy as np
 import gymnasium as gym
 
-import cyberbattle
-# from cyberbattle._env.cyberbattle_env import AttackerGoal
+from cyberbattle._env.cyberbattle_env import AttackerGoal
 from cyberbattle._env.cyberbattle_env import LOGGER
 from cyberbattle.simulation.actions import logger
 
@@ -343,7 +342,7 @@ class CyberBattleChain10(CyberBattleEnv):
 class CyberBattleTiny(CyberBattleEnv):
 
     def __init__(self):
-        attacker_goal = cyberbattle.AttackerGoal(
+        attacker_goal = AttackerGoal(
             own_atleast=2,
             own_atleast_percent=0.0
         )
@@ -353,8 +352,17 @@ class CyberBattleTiny(CyberBattleEnv):
 class CyberBattleToyCTF(CyberBattleEnv):
 
     def __init__(self):
-        attacker_goal = cyberbattle.AttackerGoal(
+        attacker_goal = AttackerGoal(
             own_atleast=6,
             own_atleast_percent=0.0
         )
         super().__init__(env_id="CyberBattleToyCtf-v0", attacker_goal=attacker_goal)
+
+class CyberBattleAutomotiveCTF(CyberBattleEnv):
+
+    def __init__(self):
+        attacker_goal = AttackerGoal(
+            own_atleast=6,
+            own_atleast_percent=0.0
+        )
+        super().__init__(env_id="CyberBattleAutomotiveCTF-v0", attacker_goal=attacker_goal)

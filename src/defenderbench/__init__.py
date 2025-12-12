@@ -7,7 +7,7 @@ import os
 
 from termcolor import colored
 
-from src.defenderbench.version import __version__
+from .version import __version__
 
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +34,7 @@ for dirname in os.listdir(root_dir):
 for task in tasks:
     try:
         # Load environments
-        module = importlib.import_module(f".{task}", package='defenderbench')
+        module = importlib.import_module(f".{task}", package=__name__)
         environments = getattr(module, 'environments', None)
         if environments:
             for env_name, version in environments:
