@@ -361,7 +361,7 @@ python3 ./src/notebooks/run_llm_report.py \
 ```
 
 reports are available at 
-- [ToyCTF Security Report](./src/notebooks/output/chain10_chatgpt51/chain10_gpt-5.1.md)
+- [ToyCTF Security Report](./src/notebooks/output/toyctf_chatgpt51/toyctf_gpt-5.1.md)
 
 #### 3) CyberBattleSim-Automotive
 
