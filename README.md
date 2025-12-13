@@ -401,7 +401,6 @@ reports are available at
 
 #### 1) If you got `our prompt was flagged as potentially violating our usage policy`
 
-
 ```bash
 openai.BadRequestError: Error code: 400 - {'error': {'message': 'Invalid prompt: your prompt was flagged as potentially violating our usage policy. Please try again with a different prompt: https://platform.openai.com/docs/guides/reasoning#advice-on-prompting', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_prompt'}}
 ```
@@ -420,22 +419,28 @@ RL: DQL
 LLM: chatgpt 5.1.
 
 
-#### 1) Toy CTF
+#### 1) TCyberBattleSim-Chain
 
 ```bash
 ./src/notebooks/run_chain10_hybrid_dql_llm.sh python3
 ```
 
-#### 2) Toy CTF
+![chain10_hybrid_dql_llm](figures/chain10_hybrid_dql_llm.gif)
+
+#### 2) CyberBattleSim-CTF
 
 ```bash
 ./src/notebooks/run_toy_ctf_hybrid_dql_llm.sh python3
 ```
 
-#### 3) Automotive CTF
+![toy_ctf_hybrid_dql_llm](figures/toy_ctf_hybrid_dql_llm.gif)
+
+#### 3) CyberBattleSim-Automotive
 
 ```bash
 ./src/notebooks/run_automotive_ctf_hybrid_dql_llm.sh python3
 ```
+
+![automotive_ctf_hybrid_dql_llm](figures/automotive_ctf_hybrid_dql_llm.gif)
 
 ## 5. Discussion
