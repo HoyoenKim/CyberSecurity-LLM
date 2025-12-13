@@ -745,8 +745,6 @@ Final Score: 3/6
 
 This suggests that the main bottleneck is not simply model capability, but the nature of ToyCTF requiring persistent exploration and state-changing progress, which LLM-only agents may still handle inconsistently without additional scaffolding.
 
----
-
 ### 7.4. Troubleshooting
 
 #### 7.4.1. Prompt Policy Violation
@@ -886,37 +884,37 @@ In summary, these results support the hypothesis that:
 
 ### 10.1. Hybrid RL + LLM
 
-#### 10.1.1 Limitations of RL (DQL)
+#### 10.1.1. Limitations of RL (DQL)
 
-**Sparse-reward sensitivity:** In CTF-style environments, rewards are often delayed. RL agents may spend many steps repeating unproductive actions before reaching informative states.
+- **Sparse-reward sensitivity:** In CTF-style environments, rewards are often delayed. RL agents may spend many steps repeating unproductive actions before reaching informative states.
 
-**Poor out-of-distribution generalization:** When the topology, vulnerabilities, or domain assumptions change (e.g., moving from ToyCTF to AutomotiveCTF), a policy trained on one setting can degrade quickly.
+- **Poor out-of-distribution generalization:** When the topology, vulnerabilities, or domain assumptions change (e.g., moving from ToyCTF to AutomotiveCTF), a policy trained on one setting can degrade quickly.
 
-**Exploration cost:** RL can require many episodes to discover effective attack paths, especially when the action space is large and the environment provides limited feedback.
+- **Exploration cost:** RL can require many episodes to discover effective attack paths, especially when the action space is large and the environment provides limited feedback.
 
-**Limited interpretability:** Even when RL succeeds, it is often difficult to explain *why* a particular sequence of actions was selected beyond Q-values and reward traces.
+- **Limited interpretability:** Even when RL succeeds, it is often difficult to explain *why* a particular sequence of actions was selected beyond Q-values and reward traces.
 
-#### 10.1.2 Limitations of LLM-based agents
+#### 10.1.2. Limitations of LLM-based agents
 
-**Inconsistent exploration under failure:** When early actions repeatedly fail and the observable state barely changes, LLM agents can get stuck in loops or keep selecting similar actions
+- **Inconsistent exploration under failure:** When early actions repeatedly fail and the observable state barely changes, LLM agents can get stuck in loops or keep selecting similar actions
 
-**Non-deterministic behavior:** The same prompt can yield different actions depending on sampling/temperature, leading to variability across runs.
+- **Non-deterministic behavior:** The same prompt can yield different actions depending on sampling/temperature, leading to variability across runs.
 
-**Shallow “trial-and-error” strategy:** LLMs may reason well, but they are not inherently optimized for persistent exploration policies that improve via reinforcement signals.
+- **Shallow “trial-and-error” strategy:** LLMs may reason well, but they are not inherently optimized for persistent exploration policies that improve via reinforcement signals.
 
-**Cost and latency:** Running an LLM for every decision step can be expensive and slow compared to a purely local RL policy.
+- **Cost and latency:** Running an LLM for every decision step can be expensive and slow compared to a purely local RL policy.
 
-#### 10.1.3 How the Hybrid approach compensates
+#### 10.1.3. How the Hybrid approach compensates
 
 The hybrid agent is designed to combine **RL’s robustness in repeated exploration** with **LLM’s semantic reasoning and domain knowledge**.
 
-**LLM → action pruning / prioritization:**
+- **LLM → action pruning / prioritization:**
 The LLM filters and ranks candidate actions using semantic cues from the observation (e.g., which node looks like a gateway, which credentials seem relevant, which transitions likely unlock progress). This reduces wasted steps in unfamiliar domains.
 
-**RL → stable decision-making and retry behavior:**
+- **RL → stable decision-making and retry behavior:**
 DQL can reliably handle repeated attempts and sparse feedback, improving consistency in ToyCTF-like environments where success depends on persistent exploration.
 
-**Net effect:**
+- **Net effect:**
 Better performance across both “complex exploration” tasks (ToyCTF) and “domain-knowledge” tasks (AutomotiveCTF). Potentially faster learning due to a reduced effective action space (LLM-guided pruning can improve sample efficiency).
 
 ### 10.2. Automatic Security Report Generation with LLM Agents
