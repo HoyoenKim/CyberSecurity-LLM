@@ -9,6 +9,8 @@ This project implements red-team (attacker) RL and hybrid RL+LLM agents in Micro
 
 Additional project documentation is available in `/doc`.
 
+---
+
 ## 1. Problem Statement
 
 ### 1.1. POMDP Modeling
@@ -52,8 +54,6 @@ We primarily use a **Deep Q-Learning (DQL)** attacker as the baseline RL agent. 
 
 * Train/evaluate **DQL** on **CyberBattleAutomotiveCTF-v0** (and compare behavior across Chain/ToyCTF when needed), measuring episode reward, steps-to-goal, and success rate under partial observability.
 
----
-
 #### 2.2.2. LLM Agent
 
 In the LLM attacker setting, we replace the RL policy with an LLM-driven decision module. The environment observation is converted into a structured prompt, and the LLM is instructed (via a system prompt) to output actions in the same discrete format expected by the environment (e.g., scan, exploit, authenticate, move laterally, use credentials). This allows a direct comparison against RL agents under identical action interfaces.
@@ -67,7 +67,7 @@ In the LLM attacker setting, we replace the RL policy with an LLM-driven decisio
 
 * Validate whether an LLM can reliably select feasible actions from partial observations, follow multi-step attack logic, and adapt to topology differences without task-specific training.
 
-### 2.3. RL + LLM Hybrid Attacker Agents
+### 2.3. Hybrid RL + LLM Attacker Agents
 
 The hybrid approach keeps RL training intact but uses an LLM to improve action efficiency. Instead of letting the RL agent explore the full action space, the LLM acts as an action-filtering layer that **prunes implausible or low-value actions** based on the current observation. The RL agent then selects from a reduced candidate set, aiming to increase sample efficiency and reduce wasted steps.
 
@@ -106,7 +106,7 @@ To activate the environment run:
 conda activate cybersimllm
 ```
 
-To using llm model, save huggingface token at llm_token.yaml like this.
+To use an LLM model, store your Hugging Face token in llm_token.yaml as shown below: 
 
 ```yaml
 huggingface:
@@ -115,7 +115,7 @@ openai:
   api_token: "api_key"
 ```
 
-Test llm is available.
+Run the test to make sure the LLM is working:
 
 ```bash
 python3 ./src/notebooks/test_huggingface.py
