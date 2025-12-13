@@ -361,7 +361,7 @@ How the Code Encodes the Scenario
 * **Deterministic exploitability for controlled evaluation:** Many exploits are set with `successRate=1.0` and minimal detection modeling, keeping the focus on *decision-making and pivot logic* rather than stochastic exploit failure.
 * **Decoys increase realism:** Debug ports and low-value nodes/actions exist to create “false leads,” which is useful when evaluating whether an LLM (or a hybrid pruner) can reduce unproductive exploration.
 
-This automotive environment provides a more domain-relevant testbed than Chain/ToyCTF by capturing common real-world pivot patterns—wireless/cellular footholds, OTA backend interaction, diagnostic access, gateway mediation, and segmented in-vehicle networks—while remaining structured enough to evaluate RL, LLM-only, and RL+LLM hybrid agents under consistent rules.
+This automotive environment provides a more domain-relevant testbed than Chain/ToyCTF by capturing common real-world pivot patterns—wireless/cellular footholds, OTA backend interaction, diagnostic access, gateway mediation, and segmented in-vehicle networks—while remaining structured enough to evaluate RL-only, LLM-only, and hybrid RL+LLM agents under consistent rules.
 
 ---
 
@@ -430,7 +430,7 @@ In our setup, the LLM receives the textual observation (discovered nodes, availa
 
 This section evaluates an Meta llama 3.1 8B agent on three CyberBattleSim environments using the same runner script (`run_huggingface_llm.py`). For each experiment, we cap the episode length (`--max_steps 100`) and save a full interaction trace (observations → chosen actions → rewards/scores) into a log file for reproducibility and later analysis.
 
-##### 7.1.1. CyberBattleSim-Chain10
+#### 7.1.1. CyberBattleSim-Chain10
 
 The Chain10 environment is relatively structured, but still requires correct sequencing (discover → obtain credential → pivot). In the log excerpt, the model repeatedly cycles between actions and rationalizations such as:
 
@@ -578,7 +578,7 @@ This motivates switching to a stronger model (e.g., ChatGPT 5.x) and/or using a 
 
 ---
 
-#### 7.2. ChatGPT 5.1
+### 7.2. ChatGPT 5.1
 
 This section evaluates an OpenAI ChatGPT (gpt-5.1) agent on three CyberBattleSim environments using the same runner script (`run_openai_llm.py`). For each experiment, we cap the episode length (`--max_steps 100`) and save a full interaction trace (observations → chosen actions → rewards/scores) into a log file for reproducibility and later analysis.
 
@@ -917,26 +917,26 @@ The LLM filters and ranks candidate actions using semantic cues from the observa
 DQL can reliably handle repeated attempts and sparse feedback, improving consistency in ToyCTF-like environments where success depends on persistent exploration.
 
 **Net effect:**
-- Better performance across both “complex exploration” tasks (ToyCTF) and “domain-knowledge” tasks (AutomotiveCTF) 
-- Potentially faster learning due to a reduced effective action space (LLM-guided pruning can improve sample efficiency)
+Better performance across both “complex exploration” tasks (ToyCTF) and “domain-knowledge” tasks (AutomotiveCTF). Potentially faster learning due to a reduced effective action space (LLM-guided pruning can improve sample efficiency).
 
 ### 10.2. Automatic Security Report Generation with LLM Agents
 
 LLM-based agents are naturally **explainable** because they can output a rationale for each step (e.g., *why* an action was chosen, *what* evidence from the observation supports it, and *how* the next step will follow). By logging these intermediate decisions, it becomes possible to automatically generate a structured security report.
 
-Practical advantages:
+#### 10.2.1. Practical advantages
 
-* **Step-by-step traceability:** Each action can be linked to observed evidence (discovered nodes, credentials, services) and to the resulting outcome (success/failure, privilege gained, lateral movement).
-* **Report automation:** Logs can be converted into standardized sections such as:
+**Step-by-step traceability:** Each action can be linked to observed evidence (discovered nodes, credentials, services) and to the resulting outcome (success/failure, privilege gained, lateral movement).
+
+**Report automation:** Logs can be converted into standardized sections such as:
 
   * Attack narrative (what happened in sequence)
   * Vulnerability exploitation summary (which vulnerability, where, with what impact)
   * Affected assets and security impact
   * Suggested mitigations and hardening guidance
 
-Potential extension to TARA workflows:
+#### 10.2.2. Potential extension to TARA workflows:
 
-* If a simulation environment is prepared (system topology + threat surfaces) and a curated **vulnerability set** is provided, the LLM can run automated pentest-like simulations and produce **TARA-ready evidence**: plausible attack paths, risk justification, and mitigation recommendations.
+If a simulation environment is prepared (system topology + threat surfaces) and a curated **vulnerability set** is provided, the LLM can run automated pentest-like simulations and produce **TARA-ready evidence**: plausible attack paths, risk justification, and mitigation recommendations.
 
 ### 10.3. Future Work
 
