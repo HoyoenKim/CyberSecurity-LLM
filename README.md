@@ -590,8 +590,7 @@ The Chain10 environment is relatively structured, but still requires correct seq
 
 This indicates that the model’s internal reasoning does not consistently bind to the simulator’s constraints (supported actions, required credentials, and valid transitions). As a result, it spends many steps exploring invalid or redundant options rather than progressing toward deeper nodes.
 
-* **Chain10** is a relatively structured environment where the optimal strategy resembles a consistent step-by-step attack chain.
-* This is useful for checking whether the LLM can maintain long-horizon planning, track discovered nodes/credentials, and avoid “wandering” actions.
+**Chain10** is a relatively structured environment where the optimal strategy resembles a consistent step-by-step attack chain. This is useful for checking whether the LLM can maintain long-horizon planning, track discovered nodes/credentials, and avoid “wandering” actions.
 
 ```bash
 python3 ./src/notebooks/run_openai_llm.py \
@@ -607,8 +606,8 @@ Logs are available here:
 ```bash
 Final Score: 12/12
 ```
-* Achieving **12/12** indicates the model successfully completed the full intended chain within the step budget.
-* This suggests strong capability in sequential reasoning and state tracking for a well-defined attack graph.
+
+Achieving **12/12** indicates the model successfully completed the full intended chain within the step budget. This suggests strong capability in sequential reasoning and state tracking for a well-defined attack graph.
 
 #### 7.2.2. CyberBattleSim-CTF (ToyCTF)
 
@@ -620,8 +619,7 @@ ToyCTF introduces more branching paths and credential dependencies. LLM-only age
 
 The low final score suggests the model fails to reliably perform the credential chain needed to reach high-value nodes, and instead wastes steps on unproductive actions.
 
-* **ToyCTF** typically requires more exploration and multiple attempts because early actions can fail with little visible state change (sparse feedback).
-* This setting highlights whether the agent can recover from repeated failures, diversify strategies, and systematically explore alternatives.
+**ToyCTF** typically requires more exploration and multiple attempts because early actions can fail with little visible state change (sparse feedback). This setting highlights whether the agent can recover from repeated failures, diversify strategies, and systematically explore alternatives.
 
 ```bash
 python3 ./src/notebooks/run_openai_llm.py \
@@ -637,8 +635,8 @@ Logs are available here:
 ```bash
 Final Score: 3/6
 ```
-* A **3/6** score suggests the model partially solved the environment but did not consistently reach all objectives.
-* A common failure mode in toy CTF-style tasks is **getting stuck**: repeated low-value actions in the early phase don’t unlock new information, so the trajectory doesn’t “branch” into productive states.
+
+A **3/6** score suggests the model partially solved the environment but did not consistently reach all objectives. A common failure mode in toy CTF-style tasks is **getting stuck**: repeated low-value actions in the early phase don’t unlock new information, so the trajectory doesn’t “branch” into productive states.
 
 #### 7.2.3. CyberBattleSim-Automotive
 
@@ -671,8 +669,8 @@ Logs are available here:
 ```bash
 Final Score: 6/6
 ```
-* Achieving **6/6** indicates the LLM leveraged higher-level knowledge to navigate the environment efficiently.
-* In particular, LLMs often excel at recognizing which nodes/steps are *conceptually* meaningful (e.g., gateway transitions, credential usage patterns), even when the environment is unfamiliar.
+
+Achieving **6/6** indicates the LLM leveraged higher-level knowledge to navigate the environment efficiently. In particular, LLMs often excel at recognizing which nodes/steps are *conceptually* meaningful (e.g., gateway transitions, credential usage patterns), even when the environment is unfamiliar.
 
 #### 7.2.4. Result Summary (ChatGPT 5.1)
 
@@ -688,21 +686,21 @@ ChatGPT 5.1 shows a clear improvement over Llama 3.1 8B in both **action groundi
 
 #### 7.2.4.1. Key Observations
 
-**Chain10 (12/12):**
+- **Chain10 (12/12):**
 Chain environments are structured and predictable, so a well-grounded LLM can reliably follow the intended sequence. ChatGPT 5.1 consistently identifies the next “productive” step (e.g., which scan/exploit yields the needed credential) and avoids the invalid-action loops seen in smaller open models.
 
-**ToyCTF (3/6):**
+- **ToyCTF (3/6):**
 ToyCTF remains challenging because it often requires **multiple retries, branching exploration, and persistence through early failures** before the environment state meaningfully changes (new nodes/credentials revealed). In this setting, RL agents typically excel because they are optimized to explore systematically and learn from repeated interaction. An LLM-only agent can still get stuck if it repeatedly chooses actions that do not progress the state, or if it fails to commit to an exploration strategy long enough.
 
-**AutomotiveCTF (6/6):**
+- **AutomotiveCTF (6/6):**
 Interestingly, ChatGPT 5.1 outperforms the baseline RL agents in AutomotiveCTF. This environment rewards understanding of *automotive-style pivoting logic* (e.g., “GTW is the bridge,” “OBD/diagnostic access unlocks DCAN,” “OTA tokens enable GTW OTA access,” “bus credentials enable ECU reachability”). The LLM’s broader prior knowledge and reasoning ability helps it recognize the gateway-mediated structure and prioritize the right chain of actions to reach internal buses/ECUs.
 
 #### 7.2.4.2. Interpretation: When RL vs LLM Works Better
 
-**ToyCTF-like environments (trial-heavy, retry-heavy):**
+- **ToyCTF-like environments (trial-heavy, retry-heavy):**
 When progress depends on repeated attempts and exploration efficiency, **mathematically optimized policies (RL)** often perform better. RL can learn which actions are statistically useful even when early steps fail frequently or provide weak signals.
 
-**AutomotiveCTF-like environments (domain-structured, knowledge-heavy):**
+- **AutomotiveCTF-like environments (domain-structured, knowledge-heavy):**
 When the environment encodes domain-specific structure and constraints (segmentation, gateways, diagnostic paths), **LLMs** can do better because they can infer the intended pivot logic from the observation and act in a more “human red-team” manner.
 
 #### 7.2.4.3. Motivation for a Hybrid Model
