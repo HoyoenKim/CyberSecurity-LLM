@@ -440,8 +440,7 @@ The Chain10 environment is relatively structured, but still requires correct seq
 
 This indicates that the model’s internal reasoning does not consistently bind to the simulator’s constraints (supported actions, required credentials, and valid transitions). As a result, it spends many steps exploring invalid or redundant options rather than progressing toward deeper nodes.
 
-* **Chain10** is a relatively structured environment where the optimal strategy resembles a consistent step-by-step attack chain.
-* This is useful for checking whether the LLM can maintain long-horizon planning, track discovered nodes/credentials, and avoid “wandering” actions.
+**Chain10** is a relatively structured environment where the optimal strategy resembles a consistent step-by-step attack chain. This is useful for checking whether the LLM can maintain long-horizon planning, track discovered nodes/credentials, and avoid “wandering” actions.
 
 ```bash
 python3 ./src/notebooks/run_huggingface_llm.py \
@@ -492,8 +491,7 @@ ToyCTF introduces more branching paths and credential dependencies. LLM-only age
 
 The low final score suggests the model fails to reliably perform the credential chain needed to reach high-value nodes, and instead wastes steps on unproductive actions.
 
-* **ToyCTF** typically requires more exploration and multiple attempts because early actions can fail with little visible state change (sparse feedback).
-* This setting highlights whether the agent can recover from repeated failures, diversify strategies, and systematically explore alternatives.
+**ToyCTF** typically requires more exploration and multiple attempts because early actions can fail with little visible state change (sparse feedback). This setting highlights whether the agent can recover from repeated failures, diversify strategies, and systematically explore alternatives.
 
 ```bash
 python3 ./src/notebooks/run_huggingface_llm.py \
