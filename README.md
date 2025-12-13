@@ -407,13 +407,13 @@ The table shows that although DQN discovers more nodes than the rule-based agent
 
 #### 6.3.2. Why the agents fail to reach CAN/LIN via GTW
 
-**Long-horizon dependency:** Reaching CAN/LIN typically requires a multi-step chain (discover GTW → obtain the correct GTW credential such as `gtw_admin_token`, `dcan_access`, or `ota_update_token` → access GTW service port → leak bus topology → dump bus credentials → pivot into BCAN/CCAN/LIN → access ECU diagnostic ports). Missing any link breaks the entire path.
+- **Long-horizon dependency:** Reaching CAN/LIN typically requires a multi-step chain (discover GTW → obtain the correct GTW credential such as `gtw_admin_token`, `dcan_access`, or `ota_update_token` → access GTW service port → leak bus topology → dump bus credentials → pivot into BCAN/CCAN/LIN → access ECU diagnostic ports). Missing any link breaks the entire path.
 
-**Sparse and delayed rewards:** Many intermediate actions are low-reward compared to immediate “impact-only” actions, so agents may prefer short-term gains instead of investing in the steps needed to unlock deeper network segments.
+- **Sparse and delayed rewards:** Many intermediate actions are low-reward compared to immediate “impact-only” actions, so agents may prefer short-term gains instead of investing in the steps needed to unlock deeper network segments.
 
-**Exploration difficulty under constraints:** Automotive segmentation (firewalls + credential-gated services) sharply reduces the set of valid transitions. Random exploration is more likely to waste steps, and the policy can converge to a suboptimal loop around early-stage nodes.
+- **Exploration difficulty under constraints:** Automotive segmentation (firewalls + credential-gated services) sharply reduces the set of valid transitions. Random exploration is more likely to waste steps, and the policy can converge to a suboptimal loop around early-stage nodes.
 
-**Partial observability:** The agent must infer that GTW is the key bridge and that bus credentials are required *before* those nodes become visible. Without strong guidance, the agent may not learn the significance of GTW-related actions.
+- **Partial observability:** The agent must infer that GTW is the key bridge and that bus credentials are required *before* those nodes become visible. Without strong guidance, the agent may not learn the significance of GTW-related actions.
 
 These results motivate the hybrid approach in the next section: using an LLM to prune low-value or invalid actions can steer exploration toward the gateway pivot sequence and improve the likelihood of reaching CAN/LIN and ECU nodes within a limited episode budget.
 
