@@ -185,6 +185,34 @@ Install the torch
 pip install torch
 ```
 
+### 3.3. Repository Structure
+
+```text
+.
+├── README.md                         # Project overview, setup, and experiment results
+├── env.yml                           # Conda environment specification
+├── requirements.txt                  # Python runtime dependencies
+├── requirements.dev.txt              # Dev tools (linting, formatting, etc.)
+├── llm_config.yaml                   # LLM provider/model configuration (OpenAI/HF, etc.)
+├── llm_token.yaml                    # API tokens (do not commit real keys)
+├── figures/                          # Exported GIFs used in README (benchmarks/attack paths)
+└── src/
+    ├── cyberbattle/                  # CyberBattleSim core (envs, simulation, baseline RL agents)
+    │   ├── _env/                     # Environment definitions (Chain, ToyCTF, AutomotiveCTF)
+    │   ├── agents/
+    │   │   ├── baseline/             # Baseline agents (DQL/DRQN/Tabular/Rule-based) + hybrid DQL agent
+    │   │   └── llm_agents/           # LLM agents (ReAct, ToT, Actor-Critic, etc.)
+    │   └── simulation/               # Simulation engine (actions, model, command/control)
+    ├── defenderbench/                # Environment wrappers and utilities used by runners
+    └── notebooks/
+        ├── *.py                      # Experiment notebooks (jupytext-style Python notebooks)
+        ├── run_*.sh                  # One-command scripts to reproduce each experiment
+        ├── run_openai_llm.py         # OpenAI LLM runner (logs JSON/MD/TXT)
+        ├── run_huggingface_llm.py    # Hugging Face LLM runner
+        ├── run_llm_report.py         # Auto security report generation from step logs
+        └── output/                   # Generated outputs (logs, JSON, MD, plots, executed notebooks)
+```
+
 ---
 
 ## 4. Run & Results
