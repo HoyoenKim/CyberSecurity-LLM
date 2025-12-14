@@ -22,6 +22,7 @@ def load_hf_token(
 HF_TOKEN = load_hf_token()
 
 client = InferenceClient(
+    #model="google/gemma-3-27b-it",
     model="meta-llama/Llama-3.1-8B-Instruct",
     token=HF_TOKEN,
 )

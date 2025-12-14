@@ -574,6 +574,18 @@ Overall, **Llama 3.1 8B performs poorly across all environments**, especially on
 
 This motivates switching to a stronger model (e.g., ChatGPT 5.x) and/or using a hybrid design where an LLM assists decision-making (e.g., action pruning or feasibility filtering) while another policy (RL) handles execution and learning.
 
+#### 7.1.5. Gemma 3 27b Model
+
+This project could run the experiments with all Hugging Face models (e.g., Gemma 3). However, I couldn’t complete all runs because I ran out of tokens. The Gemma 3 27B model may perform similarly to GPT-5.
+
+```bash
+python3 ./src/notebooks/run_huggingface_llm.py \
+    --env toyctf \
+    --model_id google/gemma-3-27b-it \
+    --max_steps 100 \
+    --output_dir ./src/notebooks/output/toy_ctf_gemma_3_27b_it > ./toy_ctf_gemma_3_27b_it.txt
+```
+
 ---
 
 ### 7.2. ChatGPT 5.1
