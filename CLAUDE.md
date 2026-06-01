@@ -201,3 +201,45 @@ pytest src/cyberbattle
 2. (🔴 A3·A4) 평가 지표 자동 집계 + 다중 시드/에피소드 평균·분산 보고.
 3. (🟠 B7·B9) 죽은 코드 정리, 공용 `ReActAgent` 추출, 신규 코드 테스트 추가.
 4. (🟡 C11·C12) 산출물 분리(gitignore) 및 README의 키 이름/경로/오타 정정.
+
+---
+
+## 9. 진행 중 작업 — Agentic 러너 & 원격 실행(newport) (2026-06-01)
+
+### 9.1 배경 / 가설
+기존 LLM harness의 ToyCTF **3/6 천장은 모델 능력이 아니라 harness 한계**일 가능성이 크다.
+근거: GPT-5.2(steps 2배)도 GPT-5.1과 동일하게 3/6 → 모델을 키워도 개선이 없었다.
+식별된 병목: ① 유효 액션 20개만 노출 ② `Action:` 정규식 파싱 ③ 작은 토큰 예산 ④ 메모리/반성 부재 ⑤ 단일 에피소드.
+
+### 9.2 신규 러너: [src/notebooks/run_agentic_llm.py](src/notebooks/run_agentic_llm.py)
+위 병목을 제거한 "제대로 된" agentic 러너:
+- **전체 유효 액션을 번호 메뉴로 노출** → `take_action(index=N)` (20개 제한 제거)
+- **tool-calling**(구조화 출력) → 정규식 파싱 실패 0
+- **명시적 메모리**: (시도→결과) 추적 + "무진전/무효 액션 반복 금지" 목록 주입
+- 토큰 예산 ↑, **다중 에피소드** 집계(best/mean/solved, invalid_ratio)
+- `--provider openai|anthropic|random` — `random`은 **API 키 없이** env/배선 검증용
+- 검증: `py_compile` + 오프라인 로직 테스트 + **newport 실제 ToyCTF random 드라이런** 통과(파이프라인 정상).
+
+```bash
+# 무키 배선 검증
+python src/notebooks/run_agentic_llm.py --env toyctf --provider random --episodes 1
+# 본 실행(키/엔드포인트 필요)
+python src/notebooks/run_agentic_llm.py --env toyctf --provider openai --model <model> --episodes 3
+```
+
+### 9.3 원격 실행 워크플로우 (newport.yonsei.ac.kr)
+- 접속: `ssh newport.yonsei.ac.kr` (user `hyeon12`). GPU: H100 NVL 95GB(+T1000 4GB는 사용 불가).
+- 코드 반입: **GitHub clone**(scp 아님) → `~/hykim_ect/CyberSecurity-LLM`.
+- 환경: `hykim_ect` conda env(py3.10, torch cu124). 활성화(전역설정 없이):
+  `export PYTHONNOUSERSITE=1; source ~/miniconda3/etc/profile.d/conda.sh; conda activate hykim_ect`
+- ⚠️ 같은 env에 CSRL이 `cyberbattlesim`을 editable로 설치해 두었으나, 러너의 `sys.path.insert(0, src)`가
+  **repo의 cyberbattle/defenderbench를 우선**시킴(검증 완료). CSRL 설치는 건드리지 않음. 추가 설치는 `termcolor`, `openai`뿐.
+
+### 9.4 모델 결정 & 현재 상태 — **GPU 대기 중**
+- gpt-5.1은 구버전 → **로컬 오픈웨이트 모델**로 전환(키 불필요·재현 가능·비용 0).
+- 선정: **`Qwen2.5-Coder-32B-Instruct`** — 공유 캐시 `/data/shared/huggingface/hub/`에 이미 존재(62GB, 읽기 가능), tool-calling 깔끔.
+  (`google/codegemma-7b`는 chat_template 없는 base라 제외. llm4decompile류도 특화 모델이라 제외.)
+- 실행 계획: **vLLM을 별도 env에 격리** 설치 → OpenAI 호환 서버 + `guided_json` structured output으로
+  모델별 tool-parser 의존 제거. 러너에 `--base_url` 추가 예정.
+- **현재 상태: H100 점유 중(타 사용자 ~51GB, util ~100% → 44GB만 여유)이라 32B(~64GB) 불가. GPU가 ~70GB 비면 32B로 ToyCTF agentic 테스트 실행 → 기존 3/6과 비교.**
+- 🔒 **보안 원칙: 서버/공유에 존재하는 Claude API 키는 이 프로젝트에서 사용하지 않는다(사이드 프로젝트).** LLM 호출은 로컬 vLLM 또는 별도 키로만.
