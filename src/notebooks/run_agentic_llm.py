@@ -363,12 +363,13 @@ class LocalServerBackend:
 
     name = "local"
 
-    def __init__(self, model: str, server_url: str, max_tokens: int = 1024):
+    def __init__(self, model: str, server_url: str, max_tokens: int = 1024, temperature: float = 0.0):
         if not server_url:
             raise ValueError("provider=local 은 --base_url(서버 주소, 예: http://localhost:8000) 가 필요합니다.")
         self.model = model
         self.url = server_url.rstrip("/")
         self.max_tokens = max_tokens
+        self.temperature = temperature
 
     def propose(self, system: str, user: str, actions: List[str]) -> Dict[str, Any]:
         import urllib.request
@@ -380,7 +381,7 @@ class LocalServerBackend:
             {"role": "system", "content": system},
             {"role": "user", "content": user + instr},
         ]
-        data = json.dumps({"messages": messages, "max_new_tokens": self.max_tokens}).encode("utf-8")
+        data = json.dumps({"messages": messages, "max_new_tokens": self.max_tokens, "temperature": self.temperature}).encode("utf-8")
         req = urllib.request.Request(
             self.url + "/chat", data=data, headers={"Content-Type": "application/json"}
         )
@@ -406,13 +407,13 @@ class LocalServerBackend:
         }
 
 
-def make_backend(provider: str, model: str, max_tokens: int, seed: int, base_url: str = None):
+def make_backend(provider: str, model: str, max_tokens: int, seed: int, base_url: str = None, temperature: float = 0.0):
     if provider == "openai":
         return OpenAIBackend(model, max_tokens, base_url=base_url)
     if provider == "anthropic":
         return AnthropicBackend(model, max_tokens)
     if provider == "local":
-        return LocalServerBackend(model, base_url, max_tokens)
+        return LocalServerBackend(model, base_url, max_tokens, temperature=temperature)
     if provider == "random":
         return RandomBackend(model, seed)
     raise ValueError(f"unknown provider: {provider}")
@@ -461,8 +462,44 @@ def short_log(env_log: str, n: int = 160) -> str:
 # =====================================================================
 # 6) 한 에피소드 실행
 # =====================================================================
+def seed_all(seed: int):
+    """재현성: 전역 RNG 시드 고정 (있는 라이브러리만, best-effort). CSRL val_compare.py 방식."""
+    random.seed(seed)
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except Exception:
+        pass
+    try:
+        import torch
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except Exception:
+        pass
+
+
+def env_node_stats(env) -> Dict[str, Any]:
+    """CSRL owned_count 방식: 원시 네트워크에서 발견/소유/전체 노드 수를 자동 집계.
+    owned_nodes = agent_installed(실제 장악) 노드 수, total = 전체 노드 수. (수기 판독 제거)"""
+    discovered = len(getattr(env, "discovered_nodes", []) or [])
+    owned_installed, total = None, None
+    try:
+        net = env.env.unwrapped.environment.network
+        total = net.number_of_nodes()
+        owned_installed = sum(
+            1 for _, d in net.nodes(data=True)
+            if d.get("data") is not None and d["data"].agent_installed
+        )
+    except Exception:
+        pass
+    return {"discovered_nodes": discovered, "owned_nodes": owned_installed, "total_nodes": total}
+
+
 def run_episode(env, backend, env_name: str, max_steps: int, max_shown: int,
-                verbose: bool, log_path: Optional[str]) -> Dict[str, Any]:
+                verbose: bool, log_path: Optional[str], seed: Optional[int] = None) -> Dict[str, Any]:
+    if seed is not None:
+        seed_all(seed)
     obs, info = env.reset()
     instructions = info.get("instructions", "")
     outcomes: List[Dict[str, Any]] = []
@@ -517,11 +554,16 @@ def run_episode(env, backend, env_name: str, max_steps: int, max_shown: int,
 
     final_score = info.get("score", 0)
     max_score = info.get("max_score", 0)
+    node_stats = env_node_stats(env)
     result = {
         "env": env_name, "provider": backend.name, "model": getattr(backend, "model", ""),
+        "seed": seed,
         "final_score": final_score, "max_score": max_score, "steps": step, "done": done,
         "invalid_actions": n_invalid,
         "invalid_ratio": (n_invalid / step) if step else 0.0,
+        "discovered_nodes": node_stats["discovered_nodes"],
+        "owned_nodes": node_stats["owned_nodes"],
+        "total_nodes": node_stats["total_nodes"],
     }
     if log_path:
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -546,7 +588,8 @@ def main():
     ap.add_argument("--max_shown", type=int, default=400, help="프롬프트에 노출할 최대 액션 수")
     ap.add_argument("--max_tokens", type=int, default=4096)
     ap.add_argument("--base_url", default=None, help="OpenAI 호환 엔드포인트(예: 로컬 vLLM http://localhost:8000/v1)")
-    ap.add_argument("--seed", type=int, default=0, help="random provider 용 시드")
+    ap.add_argument("--temperature", type=float, default=0.0, help="local 백엔드 샘플링 온도(>0이면 에피소드간 분산 측정용)")
+    ap.add_argument("--seed", type=int, default=0, help="기본 시드. 에피소드 ep는 seed+ep로 RNG 고정(재현성)")
     ap.add_argument("--output_dir", default=os.path.join("src", "notebooks", "output", "agentic"))
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
@@ -554,7 +597,7 @@ def main():
     if not args.model:
         args.model = {"openai": "gpt-5.1", "anthropic": "claude-opus-4-8", "local": "Qwen3.6-27B", "random": "heuristic"}[args.provider]
 
-    backend = make_backend(args.provider, args.model, args.max_tokens, args.seed, args.base_url)
+    backend = make_backend(args.provider, args.model, args.max_tokens, args.seed, args.base_url, args.temperature)
     os.makedirs(args.output_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_short = args.model.replace("/", "_")
@@ -565,26 +608,39 @@ def main():
 
     results = []
     for ep in range(args.episodes):
+        ep_seed = args.seed + ep
         env = ENV_FACTORY[args.env]()
         env.nb_steps = args.max_steps  # 내부 100스텝 상한을 max_steps 로 맞춤
         log_path = os.path.join(args.output_dir, f"{args.env}_{args.provider}_{model_short}_ep{ep}_{ts}.json")
-        print(f"--- episode {ep+1}/{args.episodes} ---")
+        print(f"--- episode {ep+1}/{args.episodes} (seed={ep_seed}) ---")
         t0 = time.time()
         r = run_episode(env, backend, args.env, args.max_steps, args.max_shown,
-                        verbose=not args.quiet, log_path=log_path)
+                        verbose=not args.quiet, log_path=log_path, seed=ep_seed)
         r["seconds"] = round(time.time() - t0, 1)
         results.append(r)
-        print(f"  => final {r['final_score']}/{r['max_score']} in {r['steps']} steps, "
+        print(f"  => owned {r['owned_nodes']}/{r['total_nodes']} (goal-score {r['final_score']}/{r['max_score']}), "
+              f"found {r['discovered_nodes']}, {r['steps']} steps, "
               f"invalid={r['invalid_actions']} ({r['invalid_ratio']:.0%}), done={r['done']}, {r['seconds']}s\n")
 
     scores = [r["final_score"] for r in results]
+    owned = [r["owned_nodes"] for r in results if r["owned_nodes"] is not None]
     maxs = results[0]["max_score"] if results else 0
+    total_nodes = next((r["total_nodes"] for r in results if r["total_nodes"] is not None), None)
     print("=== SUMMARY ===")
     for i, r in enumerate(results):
-        print(f"  ep{i}: {r['final_score']}/{r['max_score']} | steps={r['steps']} | invalid={r['invalid_ratio']:.0%}")
+        print(f"  ep{i} (seed={r.get('seed')}): owned {r['owned_nodes']}/{r['total_nodes']} | "
+              f"goal-score {r['final_score']}/{r['max_score']} | found {r['discovered_nodes']} | "
+              f"steps={r['steps']} | invalid={r['invalid_ratio']:.0%}")
     if scores:
-        print(f"  best={max(scores)}/{maxs}  mean={sum(scores)/len(scores):.2f}/{maxs}  "
+        import statistics
+        mean = statistics.mean(scores)
+        std = statistics.pstdev(scores) if len(scores) > 1 else 0.0
+        print(f"  goal-score: best={max(scores)}/{maxs}  mean={mean:.2f}±{std:.2f}/{maxs}  "
               f"solved={sum(1 for s in scores if s >= maxs)}/{len(scores)}")
+        if owned:
+            omean = statistics.mean(owned)
+            ostd = statistics.pstdev(owned) if len(owned) > 1 else 0.0
+            print(f"  owned-nodes: best={max(owned)}/{total_nodes}  mean={omean:.2f}±{ostd:.2f}/{total_nodes}")
 
     summary_path = os.path.join(args.output_dir, f"summary_{args.env}_{args.provider}_{model_short}_{ts}.json")
     with open(summary_path, "w", encoding="utf-8") as f:
