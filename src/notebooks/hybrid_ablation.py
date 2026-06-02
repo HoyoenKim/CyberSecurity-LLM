@@ -231,7 +231,8 @@ def main():
     ap = argparse.ArgumentParser(description="DQL vs DQL+LLM ablation (identical policy/seed/budget)")
     ap.add_argument("--env", default="toyctf", choices=list(ENV_CFG.keys()))
     ap.add_argument("--train_episodes", type=int, default=20)
-    ap.add_argument("--iterations", type=int, default=2000)
+    ap.add_argument("--iterations", type=int, default=2000, help="학습 시 에피소드당 step 상한")
+    ap.add_argument("--eval_iterations", type=int, default=200, help="평가 시 에피소드당 step 상한(LLM 호출 폭증 방지)")
     ap.add_argument("--eval_episodes", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--server_url", default=None, help="로컬 LLM 서버(예: http://127.0.0.1:8000). 없으면 LLM조건 생략(또는 --fake_llm)")
@@ -274,7 +275,7 @@ def main():
     print(f"[train] DQL trained in {time.time()-t0:.1f}s")
 
     # 3) 평가 A: 순수 DQL (정책 동결)
-    a = eval_runs(ge, ep, FrozenEval(base), args.eval_episodes, args.iterations, args.seed, "eval-DQL")
+    a = eval_runs(ge, ep, FrozenEval(base), args.eval_episodes, args.eval_iterations, args.seed, "eval-DQL")
 
     # 4) 평가 B: DQL + LLM 프루닝 (동일 정책/시드)
     run_llm = bool(args.server_url) or args.fake_llm
@@ -284,7 +285,7 @@ def main():
         pruner = LLMServerPruner(base, args.server_url, every=args.llm_every_steps,
                                  pool=args.candidate_pool, topk=args.llm_topk,
                                  max_tokens=args.max_tokens, fake=args.fake_llm)
-        b = eval_runs(ge, ep, pruner, args.eval_episodes, args.iterations, args.seed, "eval-DQL+LLM")
+        b = eval_runs(ge, ep, pruner, args.eval_episodes, args.eval_iterations, args.seed, "eval-DQL+LLM")
 
     # 5) 결과 비교
     print("\n=== ABLATION RESULT (identical policy & seeds; only eval-time LLM differs) ===")
