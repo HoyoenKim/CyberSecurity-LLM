@@ -269,9 +269,13 @@ TAKE_ACTION_PARAMS = {
 class OpenAIBackend:
     name = "openai"
 
-    def __init__(self, model: str, max_tokens: int = 4096):
+    def __init__(self, model: str, max_tokens: int = 4096, base_url: str = None):
         from openai import OpenAI
-        self.client = OpenAI(api_key=load_api_key("openai"))
+        if base_url:
+            # 로컬 vLLM 등 OpenAI 호환 엔드포인트: 실제 키 불필요(더미 허용)
+            self.client = OpenAI(base_url=base_url, api_key=(os.getenv("OPENAI_API_KEY") or "EMPTY"))
+        else:
+            self.client = OpenAI(api_key=load_api_key("openai"))
         self.model = model
         self.max_tokens = max_tokens
         self.tools = [{
@@ -352,9 +356,9 @@ class AnthropicBackend:
         return {"index": None, "action": None, "reason": "", "raw": text}
 
 
-def make_backend(provider: str, model: str, max_tokens: int, seed: int):
+def make_backend(provider: str, model: str, max_tokens: int, seed: int, base_url: str = None):
     if provider == "openai":
-        return OpenAIBackend(model, max_tokens)
+        return OpenAIBackend(model, max_tokens, base_url=base_url)
     if provider == "anthropic":
         return AnthropicBackend(model, max_tokens)
     if provider == "random":
@@ -489,6 +493,7 @@ def main():
     ap.add_argument("--max_steps", type=int, default=100)
     ap.add_argument("--max_shown", type=int, default=400, help="프롬프트에 노출할 최대 액션 수")
     ap.add_argument("--max_tokens", type=int, default=4096)
+    ap.add_argument("--base_url", default=None, help="OpenAI 호환 엔드포인트(예: 로컬 vLLM http://localhost:8000/v1)")
     ap.add_argument("--seed", type=int, default=0, help="random provider 용 시드")
     ap.add_argument("--output_dir", default=os.path.join("src", "notebooks", "output", "agentic"))
     ap.add_argument("--quiet", action="store_true")
@@ -497,7 +502,7 @@ def main():
     if not args.model:
         args.model = {"openai": "gpt-5.1", "anthropic": "claude-opus-4-8", "random": "heuristic"}[args.provider]
 
-    backend = make_backend(args.provider, args.model, args.max_tokens, args.seed)
+    backend = make_backend(args.provider, args.model, args.max_tokens, args.seed, args.base_url)
     os.makedirs(args.output_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_short = args.model.replace("/", "_")
