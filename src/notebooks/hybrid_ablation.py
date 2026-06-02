@@ -100,6 +100,15 @@ class FrozenEval:
         return self.base.exploit(wrapped_env, observation)
 
 
+def _describe_action(ga) -> str:
+    """gym_action을 약간 더 읽기 쉬운 문자열로(노드 '이름'까진 디코드 못함 — 원시 env 한계)."""
+    try:
+        (k, v), = ga.items()
+        return "%s %s" % (k, list(map(int, list(v))))
+    except Exception:
+        return repr(ga)
+
+
 class LLMServerPruner(FrozenEval):
     """평가 시 LLM 프루닝: 후보 샘플링 → Q 상위 topK → 로컬 서버가 1개 pick.
     (기존 toy_ctf_hybrid_dql_llm.py 의 LLMPrunedExploitWrapper 를 로컬 서버용으로 재배선)"""
@@ -121,9 +130,12 @@ class LLMServerPruner(FrozenEval):
         self._step = 0
         self.n_llm_calls = 0
         self.n_llm_changed = 0  # LLM pick이 Q-top1과 달랐던 횟수
+        self.raw_samples = []   # 초반 raw 응답 샘플(파싱/rubber-stamp 진단용)
 
-    def _ask_pick(self, payload: dict, n: int) -> Optional[int]:
+    def _ask_pick(self, payload: dict, n: int, raw_out: Optional[dict] = None) -> Optional[int]:
         if self.fake or not self.url:
+            if raw_out is not None:
+                raw_out["text"] = "(fake-random)"
             return random.randrange(n)  # 구조검증용
         body = json.dumps({
             "messages": [
@@ -138,13 +150,17 @@ class LLMServerPruner(FrozenEval):
                                          headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=300) as r:
                 text = (json.loads(r.read().decode("utf-8")).get("text") or "")
+            if raw_out is not None:
+                raw_out["text"] = text
             import re
             m = re.search(r"\{.*\}", text, flags=re.DOTALL)
             if not m:
                 return None
             pick = json.loads(m.group(0)).get("pick")
             return int(pick) if pick is not None else None
-        except Exception:
+        except Exception as e:
+            if raw_out is not None:
+                raw_out["text"] = "ERR:%s" % e
             return None
 
     def exploit(self, wrapped_env, observation):
@@ -164,23 +180,30 @@ class LLMServerPruner(FrozenEval):
             return self.base.exploit(wrapped_env, observation)
 
         candidates.sort(key=lambda x: x[0], reverse=True)
-        top = candidates[: self.topk]
+        top = candidates[: self.topk]  # top[0] = Q-argmax
+        # Q값 비노출 + 제시 순서 셔플 → LLM이 Q-rank를 보고 추인(rubber-stamp)하는 것 차단
+        order = list(range(len(top)))
+        random.shuffle(order)
         try:
             obs_txt = json.dumps(observation, ensure_ascii=False)[: self.obs_max_chars]
         except Exception:
             obs_txt = str(observation)[: self.obs_max_chars]
         payload = {
             "observation_preview": obs_txt,
-            "candidates": [{"id": i, "q": round(float(qv), 4), "gym_action": repr(ga)}
-                           for i, (qv, ga, md) in enumerate(top)],
+            "candidates": [{"id": disp, "action": _describe_action(top[orig][1])}
+                           for disp, orig in enumerate(order)],
         }
         self.n_llm_calls += 1
-        pick = self._ask_pick(payload, len(top))
-        if pick is None or not (0 <= pick < len(top)):
-            pick = 0  # 실패 시 Q-top1
-        if pick != 0:
+        raw = {}
+        pick_disp = self._ask_pick(payload, len(top), raw)
+        if pick_disp is None or not (0 <= pick_disp < len(top)):
+            pick_disp = order.index(0)  # 실패 시 Q-top1(orig 0)
+        orig = order[pick_disp]
+        if orig != 0:
             self.n_llm_changed += 1
-        qv, ga, md = top[pick]
+        if len(self.raw_samples) < 8:
+            self.raw_samples.append({"orig": orig, "raw": (raw.get("text", "") or "")[:160]})
+        qv, ga, md = top[orig]
         return "exploit[llm_pruned]", ga, md
 
 
@@ -297,13 +320,16 @@ def main():
         if pruner:
             print(f"  [LLM] calls={pruner.n_llm_calls} changed_from_Qtop1={pruner.n_llm_changed} "
                   f"({(pruner.n_llm_changed/pruner.n_llm_calls*100 if pruner.n_llm_calls else 0):.0f}% — "
-                  f"0%면 LLM이 Q-argmax와 동일 = 무의미)")
+                  f"0%면 LLM이 Q-top1만 고름/못고름 = 무의미)")
+            for s in pruner.raw_samples[:5]:
+                print(f"    raw sample: orig={s['orig']} | {s['raw']!r}")
     else:
         print("  (LLM 조건 생략: --server_url 또는 --fake_llm 필요)")
 
     out = {"args": vars(args), "no_llm": a, "with_llm": b,
            "llm_calls": getattr(pruner, "n_llm_calls", 0),
-           "llm_changed": getattr(pruner, "n_llm_changed", 0)}
+           "llm_changed": getattr(pruner, "n_llm_changed", 0),
+           "raw_samples": getattr(pruner, "raw_samples", [])}
     ts = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     path = os.path.join(args.output_dir, f"ablation_{args.env}_seed{args.seed}_{ts}.json")
     with open(path, "w", encoding="utf-8") as f:
