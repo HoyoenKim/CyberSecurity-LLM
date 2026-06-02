@@ -243,3 +243,24 @@ python src/notebooks/run_agentic_llm.py --env toyctf --provider openai --model <
   모델별 tool-parser 의존 제거. 러너에 `--base_url` 추가 예정.
 - **현재 상태: H100 점유 중(타 사용자 ~51GB, util ~100% → 44GB만 여유)이라 32B(~64GB) 불가. GPU가 ~70GB 비면 32B로 ToyCTF agentic 테스트 실행 → 기존 3/6과 비교.**
 - 🔒 **보안 원칙: 서버/공유에 존재하는 Claude API 키는 이 프로젝트에서 사용하지 않는다(사이드 프로젝트).** LLM 호출은 로컬 vLLM 또는 별도 키로만.
+
+---
+
+## 10. 로컬 오픈모델 실행 결과 & CSRL 방법론 이식 (2026-06-02)
+
+### 10.1 Qwen3.6-27B 로컬 실행 결과 (newport H100)
+- 모델 `Qwen3.6-27B`(`/data/shared/huggingface/hub/Qwen3.6-27B`)은 `qwen3_5` 아키텍처(멀티모달+linear attention)라 **vLLM이 못 띄움 → transformers 전용**.
+  서버 env는 **`qwen2`**(transformers 5.6.2). `qwen` env는 cudnn `.so` 누락으로 깨져 있어 사용 불가.
+- 브리지: [src/notebooks/qwen_server.py](src/notebooks/qwen_server.py)가 transformers HTTP `/chat`을 제공 ← 러너 `--provider local --base_url`.
+- **결과: ToyCTF 2/6** (60스텝, invalid 18%). 모델이 자격증명(`SASTOKEN1`) 재사용 루프에 빠져 step29부터 정체.
+- **정직한 해석**: "harness만 고치면 3/6 천장이 깨진다" 가설은 이 모델로는 **미입증**(오히려 GPT-5.1 구 harness 3/6보다 낮음).
+  harness 개선으로 무효율은 random 65% → 18%로 감소했으나, **모델의 루프 탈출 실패가 더 큰 병목**. 단일 에피소드·60스텝(vs 100)이라 완전 동일 조건 비교는 아님.
+
+### 10.2 CSRL(CyberSecurity-RL)에서 이식한 방법론
+자매 RL 프로젝트 CSRL은 이미 fair seeded re-evaluation·owned_count·동일조건 비교를 적용해 둠. `run_agentic_llm.py`에 이식(커밋 `294333b`):
+- `env_node_stats()` — 원시 네트워크에서 **owned(agent_installed)/found/total 노드 자동 집계**(🔴 A3 해결). ToyCTF=전체 10노드/목표 6.
+- `seed_all()` + 에피소드별 시드(재현성), **mean±std** 요약(🔴 A4), `--temperature`(분산 측정).
+- 교훈: CSRL §7-2(불공정 비교)·§7-1(DRQN 우월성=비교 아티팩트)은 우리 하이브리드 "극적 향상" 주장과 **동일한 함정** → 동일조건 ablation 필수. DRQN은 7배 느리고 실익 불명 → 하이브리드 base는 DQN로 충분.
+
+### 10.3 남은 핵심 과제
+- 🔴 A2(하이브리드 불공정 비교): **DQL vs DQL+LLM를 동일 시드·config·예산으로 ablation** ([src/notebooks/hybrid_ablation.py](src/notebooks/hybrid_ablation.py), CSRL `fair_compare.py` 템플릿). LLM은 로컬 Qwen3 서버 경유.
