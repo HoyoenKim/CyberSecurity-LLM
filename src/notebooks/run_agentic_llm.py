@@ -29,6 +29,7 @@ ToyCTF 같은 환경이 정말 포화(예: 6/6)되는지 검증하는 것.
 import os
 import sys
 import json
+import re
 import time
 import random
 import argparse
@@ -356,11 +357,62 @@ class AnthropicBackend:
         return {"index": None, "action": None, "reason": "", "raw": text}
 
 
+class LocalServerBackend:
+    """qwen_server.py 같은 로컬 transformers HTTP 서버(/chat)에 messages를 보내고
+    구조화 JSON {reason, index, action}를 받아 파싱한다. tool-calling 미지원 모델용."""
+
+    name = "local"
+
+    def __init__(self, model: str, server_url: str, max_tokens: int = 1024):
+        if not server_url:
+            raise ValueError("provider=local 은 --base_url(서버 주소, 예: http://localhost:8000) 가 필요합니다.")
+        self.model = model
+        self.url = server_url.rstrip("/")
+        self.max_tokens = max_tokens
+
+    def propose(self, system: str, user: str, actions: List[str]) -> Dict[str, Any]:
+        import urllib.request
+        instr = (
+            "\n\nRespond with ONLY a JSON object and nothing else (no markdown, no prose):\n"
+            '{"reason": "<one short sentence>", "index": <integer index of the chosen action from the VALID ACTIONS menu>}'
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user + instr},
+        ]
+        data = json.dumps({"messages": messages, "max_new_tokens": self.max_tokens}).encode("utf-8")
+        req = urllib.request.Request(
+            self.url + "/chat", data=data, headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=900) as r:
+                out = json.loads(r.read().decode("utf-8"))
+            text = out.get("text", "") or ""
+        except Exception as e:
+            return {"index": None, "action": None, "reason": f"server error: {e}", "raw": ""}
+
+        m = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not m:
+            return {"index": None, "action": None, "reason": "", "raw": text}
+        try:
+            obj = json.loads(m.group(0))
+        except Exception:
+            return {"index": None, "action": None, "reason": "", "raw": text}
+        return {
+            "index": obj.get("index"),
+            "action": obj.get("action"),
+            "reason": obj.get("reason", ""),
+            "raw": text,
+        }
+
+
 def make_backend(provider: str, model: str, max_tokens: int, seed: int, base_url: str = None):
     if provider == "openai":
         return OpenAIBackend(model, max_tokens, base_url=base_url)
     if provider == "anthropic":
         return AnthropicBackend(model, max_tokens)
+    if provider == "local":
+        return LocalServerBackend(model, base_url, max_tokens)
     if provider == "random":
         return RandomBackend(model, seed)
     raise ValueError(f"unknown provider: {provider}")
@@ -486,7 +538,7 @@ def run_episode(env, backend, env_name: str, max_steps: int, max_shown: int,
 def main():
     ap = argparse.ArgumentParser(description="Agentic LLM runner for CyberBattleSim / Automotive CTF")
     ap.add_argument("--env", default="toyctf", choices=list(ENV_FACTORY.keys()))
-    ap.add_argument("--provider", default="openai", choices=["openai", "anthropic", "random"])
+    ap.add_argument("--provider", default="openai", choices=["openai", "anthropic", "local", "random"])
     ap.add_argument("--model", default=None,
                     help="미지정 시 provider별 기본값: openai=gpt-5.1, anthropic=claude-opus-4-8, random=heuristic")
     ap.add_argument("--episodes", type=int, default=3)
@@ -500,7 +552,7 @@ def main():
     args = ap.parse_args()
 
     if not args.model:
-        args.model = {"openai": "gpt-5.1", "anthropic": "claude-opus-4-8", "random": "heuristic"}[args.provider]
+        args.model = {"openai": "gpt-5.1", "anthropic": "claude-opus-4-8", "local": "Qwen3.6-27B", "random": "heuristic"}[args.provider]
 
     backend = make_backend(args.provider, args.model, args.max_tokens, args.seed, args.base_url)
     os.makedirs(args.output_dir, exist_ok=True)
